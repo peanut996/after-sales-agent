@@ -1,5 +1,6 @@
 import * as path from "path";
 import type { HookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
+import { allowedMcpServerTools } from "./mcp-servers";
 
 /**
  * 查询模式配置
@@ -7,11 +8,7 @@ import type { HookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 export const QUERY_OPTIONS = {
   maxTurns: 5,
   model: "opus" as const,
-  allowedTools: [
-    "mcp__after_sales_tools__check_access_code_refund",
-    "mcp__browser_simulator__simulate_browser_access",
-    "mcp__browser_simulator__deactivate_access_code"
-  ] as string[]
+  allowedTools: allowedMcpServerTools
 };
 
 /**

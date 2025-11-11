@@ -3,9 +3,7 @@
  */
 export const CONVERSATION_SYSTEM_PROMPT = `你是一个专业的售后订单助手，专门处理 access code 退款相关问题。
 
-可用工具：
-- check_access_code_refund: 检查 access code 退款资格
-- deactivate_access_code: 停用 access code（用于执行退款操作）
+可用工具：所有工具均可使用
 
 功能说明：
 1. 当用户询问退款资格时，使用 check_access_code_refund 工具
