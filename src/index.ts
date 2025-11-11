@@ -166,45 +166,6 @@ async function startConversationMode() {
       return "quit";
     }
 
-    // 检查是否包含 access code
-    const accessCode = extractAccessCode(message);
-    if (accessCode) {
-      console.log(`\n🔍 检测到 access code: ${accessCode}`);
-      console.log("⏳ 正在检查退款资格...\n");
-
-      try {
-        const result = await checkAccessCodeRefund(accessCode);
-        if (result.success) {
-          return `✅ 退款资格检查结果：
-
-📋 详细信息：
-• Access Code: ${result.code}
-• 剩余次数: ${result.remainingUses}
-• 状态: ${result.isActive ? "✅ 激活" : "❌ 停用"}
-• 处理模式: ${result.processingMode}
-
-💰 退款资格: ${result.eligible ? "✅ 符合退款条件" : "❌ 不符合退款条件"}
-🔄 退款比例: ${result.refundPercentage}%
-📝 原因: ${result.reason}
-
-${result.eligible ? "您可以申请退款，请联系客服处理。" : "抱歉，当前不符合退款条件。"}`;
-        } else {
-          return `❌ 检查失败：${result.reason}`;
-        }
-      } catch (error) {
-        return `❌ 检查过程中发生错误: ${error instanceof Error ? error.message : String(error)}`;
-      }
-    } else {
-      // 如果没有检测到 access code，提示用户
-      return `请提供您的 access code。Access code 应该是：
-• 8位以上的字母数字组合
-• 例如：ABC12345、XYZ78901
-• 通常在您的购买确认邮件或账户页面中找到
-
-请直接输入或粘贴您的 access code，我帮您检查退款资格。`;
-    }
-
-    // 如果没有 access code，调用 Claude Agent 进行智能对话
     conversationHistory.push({ role: "user", content: message });
 
     try {
@@ -274,8 +235,17 @@ ${result.eligible ? "您可以申请退款，请联系客服处理。" : "抱歉
 
 // 启动主程序
 async function main() {
-  // 默认并始终启动对话模式，禁用 query 与单次查询模式
-  await startConversationMode();
+  // 从命令行参数判断模式
+  const args = process.argv.slice(2);
+  const mode = args[0];
+
+  if (mode === "--chat" || mode === "-c") {
+    // 启动对话模式（直接调用函数）
+    await startConversationMode();
+  } else {
+    // 默认启动 Query 模式（使用 Claude Agent）
+    await startQueryMode();
+  }
 }
 
 // 运行主程序
