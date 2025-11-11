@@ -1,7 +1,6 @@
 import { query, tool, createSdkMcpServer } from "@anthropic-ai/claude-agent-sdk";
 import readline from "readline";
 
-import { checkAccessCodeRefund } from "./services";
 import { CONVERSATION_SYSTEM_PROMPT, createQueryPrompt, DEFAULT_RESPONSES, isExitCommand } from "./prompts";
 import { QUERY_OPTIONS, CHECK_TOOL_SECURITY_HOOKS } from "./config";
 import type { ConversationMessage } from "./types";
@@ -80,15 +79,29 @@ const checkAccessCodeRefundTool = tool(
         reason = `Access code 剩余次数为 ${codeInfo.usesRemaining}，不在退款范围内。退款范围：10、20、100次`;
       }
 
+      // 计算已使用次数（默认按10次计算总次数）
+      const initialUses = codeInfo.initialUses || 10;
+      const remainingUses = codeInfo.usesRemaining;
+      const usedTimes = initialUses - remainingUses;
+
+      // 计算退款金额（10次=5元，单价0.5元/次）
+      const pricePerUse = 0.5;
+      const totalPrice = initialUses * pricePerUse;
+      const refundAmount = remainingUses * pricePerUse;
+
       const result = {
         success: true,
         code: codeInfo.code,
-        remainingUses: codeInfo.usesRemaining,
+        initialUses,
+        remainingUses,
+        usedTimes,
         isActive: codeInfo.isActive,
         processingMode: codeInfo.processingMode,
         eligible,
         refundPercentage,
-        reason
+        reason,
+        totalPrice,
+        refundAmount
       };
 
       console.log("✅ 检查完成！");
@@ -100,11 +113,14 @@ const checkAccessCodeRefundTool = tool(
             type: "text" as const,
             text: `检查结果：
 - Access Code: ${result.code}
-- 剩余次数: ${result.remainingUses}
+- 总次数: ${result.initialUses} 次
+- 已使用: ${result.usedTimes} 次
+- 剩余次数: ${result.remainingUses} 次
 - 状态: ${result.isActive ? "激活" : "停用"}
 - 处理模式: ${result.processingMode}
 - 退款资格: ${result.eligible ? "符合" : "不符合"}
 - 退款比例: ${result.refundPercentage}%
+- 价格信息: 总价¥${result.totalPrice}，可退款¥${result.refundAmount}
 - 原因: ${result.reason}`
           }
         ]
@@ -204,14 +220,175 @@ const simulateBrowserTool = tool(
   }
 );
 
-// 重新创建 MCP 服务器，包含模拟浏览器工具
+// 定义停用 access code 工具
+const deactivateAccessCodeTool = tool(
+  "deactivate_access_code",
+  "停用 access code，将其状态设置为 inactive。这是退款操作的必要步骤，将使该 access code 无法继续使用。",
+  {
+    access_code: z.string().describe("需要停用的 access code"),
+    reason: z.string().optional().describe("停用原因，如 'user_refund_request'")
+  },
+  async ({ access_code, reason = "user_refund_request" }: { access_code: string; reason?: string }) => {
+    console.log(`\n🔒 正在停用 access code: ${access_code}`);
+
+    try {
+      const API_BASE_URL = "https://ghibliflowstudio.com/api";
+      const API_TOKEN = process.env.GHIBLI_API_TOKEN;
+
+      // 首先获取 access code 的当前状态和使用信息
+      console.log(`📡 查询当前状态: ${API_BASE_URL}/access-codes/${access_code}`);
+
+      const getResponse = await fetch(`${API_BASE_URL}/access-codes/${access_code}`, {
+        method: "GET",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json",
+          "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+          "Referer": "https://ghibliflowstudio.com/",
+          "Origin": "https://ghibliflowstudio.com",
+          "Authorization": `Bearer ${API_TOKEN}`,
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache"
+        }
+      });
+
+      if (!getResponse.ok) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `❌ 获取 access code 信息失败：API 返回 ${getResponse.status} 错误。`
+            }
+          ]
+        };
+      }
+
+      const getData = await getResponse.json() as { success: boolean; data: any };
+      if (!getData.success || !getData.data) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `❌ Access code ${access_code} 不存在或无效。`
+            }
+          ]
+        };
+      }
+
+      const codeInfo = getData.data;
+      // 默认按10次计算总次数
+      const initialUses = codeInfo.initialUses || 10;
+      const remainingUses = codeInfo.usesRemaining;
+      const usedTimes = initialUses - remainingUses;
+
+      // 计算退款金额（10次=5元，单价0.5元/次）
+      const pricePerUse = 0.5;
+      const totalPrice = initialUses * pricePerUse;
+      const refundAmount = remainingUses * pricePerUse;
+
+      console.log(`📊 使用情况: 总次数=${initialUses}, 剩余=${remainingUses}, 已使用=${usedTimes}`);
+
+      // 然后执行停用操作
+      console.log(`📡 使用 PATCH 方法更新状态: ${API_BASE_URL}/access-codes/${access_code}`);
+
+      const response = await fetch(`${API_BASE_URL}/access-codes/${access_code}`, {
+        method: "PATCH",
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Content-Type": "application/json",
+          "Accept": "application/json",
+          "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+          "Referer": "https://ghibliflowstudio.com/",
+          "Origin": "https://ghibliflowstudio.com",
+          "Authorization": `Bearer ${API_TOKEN}`,
+          "Cache-Control": "no-cache",
+          "Pragma": "no-cache"
+        },
+        body: JSON.stringify({
+          isActive: false,
+          reason: reason
+        })
+      });
+
+      console.log(`📥 响应状态: ${response.status} ${response.statusText}`);
+
+      if (!response.ok) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `❌ 停用失败：API 返回 ${response.status} 错误。可能是 access code 不存在、权限不足或已经被停用。`
+            }
+          ]
+        };
+      }
+
+      const data = await response.json() as { success: boolean; data?: any };
+      console.log(`📊 响应数据:`, JSON.stringify(data, null, 2));
+
+      if (!data.success) {
+        return {
+          content: [
+            {
+              type: "text" as const,
+              text: `❌ 停用失败：API 返回失败状态。`
+            }
+          ]
+        };
+      }
+
+      console.log("✅ 停用完成！");
+      console.log(`📋 Access code ${access_code} 已成功设置为 inactive`);
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `✅ 停用成功！
+Access Code: ${access_code}
+状态: 已停用 (inactive)
+
+📊 使用情况：
+- 总次数: ${initialUses} 次
+- 已使用: ${usedTimes} 次
+- 剩余: ${remainingUses} 次
+- 可退款金额: ¥${refundAmount}
+
+💰 退款信息：
+- 总价: ¥${totalPrice}
+- 已使用: ¥${usedTimes * pricePerUse}
+- 可退金额: ¥${refundAmount}
+
+停用原因: ${reason}
+时间: ${new Date().toLocaleString()}
+
+该 access code 已无法继续使用，退款操作已完成。`
+          }
+        ]
+      };
+
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error("❌ 停用过程中发生错误:", errorMessage);
+
+      return {
+        content: [
+          {
+            type: "text" as const,
+            text: `❌ 停用过程中发生错误: ${errorMessage}`
+          }
+        ]
+      };
+    }
+  }
+);
+
+// 重新创建 MCP 服务器，包含模拟浏览器工具和停用工具
 const browserMcpServer = createSdkMcpServer({
   name: "browser_simulator",
   version: "1.0.0",
-  tools: [simulateBrowserTool]
+  tools: [simulateBrowserTool, deactivateAccessCodeTool]
 });
-
-
 
 // Query 模式 - 使用 Claude Agent + Tool
 async function startQueryMode() {
@@ -423,6 +600,3 @@ async function main() {
 
 // 运行主程序
 main().catch(console.error);
-
-// 导出工具供其他模块使用
-export { checkAccessCodeRefund };

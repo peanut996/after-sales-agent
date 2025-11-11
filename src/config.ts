@@ -9,7 +9,8 @@ export const QUERY_OPTIONS = {
   model: "opus" as const,
   allowedTools: [
     "mcp__after_sales_tools__check_access_code_refund",
-    "mcp__browser_simulator__simulate_browser_access"
+    "mcp__browser_simulator__simulate_browser_access",
+    "mcp__browser_simulator__deactivate_access_code"
   ] as string[]
 };
 
@@ -102,6 +103,25 @@ export const CHECK_TOOL_SECURITY_HOOKS = {
               continue: false
             };
           }
+          return { continue: true };
+        }
+      ]
+    },
+    {
+      matcher: "mcp__browser_simulator__deactivate_access_code" as const,
+      hooks: [
+        async (input: any): Promise<HookJSONOutput> => {
+          const accessCode = input.tool_input?.access_code;
+          // 确保 access code 格式正确（8位以上字母数字）
+          if (accessCode && !/^[A-Z0-9]{8,}$/i.test(accessCode)) {
+            return {
+              decision: 'block',
+              stopReason: `Access code 格式不正确: ${accessCode}`,
+              continue: false
+            };
+          }
+          // 记录操作日志
+          console.log(`🔒 安全检查通过：停用 access code ${accessCode}`);
           return { continue: true };
         }
       ]
