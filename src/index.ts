@@ -59,6 +59,7 @@ async function startQueryMode() {
       });
 
       for await (const msg of q) {
+        console.log(message)
         if (msg.type === 'assistant' && msg.message) {
           const textContent = msg.message.content.find((c: any) => c.type === 'text');
           if (textContent && 'text' in textContent) {
