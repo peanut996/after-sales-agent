@@ -129,18 +129,7 @@ export async function checkAccessCodeRefund(accessCode: string): Promise<CheckRe
     reason: ""
   };
 
-  // 检查退款资格
-  if (!codeInfo.isActive) {
-    result.reason = "Access code 已停用";
-    return result;
-  }
-
-  if (codeInfo.usesRemaining === 0) {
-    result.reason = "Access code 已全部使用完毕";
-    return result;
-  }
-
-  // 检查剩余次数是否为 10、20 或 100
+  // 只检查剩余次数是否为 10、20 或 100（不检查 status，因为只有管理员能修改）
   const validRefundAmounts = [10, 20, 100];
   if (!validRefundAmounts.includes(codeInfo.usesRemaining)) {
     result.reason = `Access code 剩余次数为 ${codeInfo.usesRemaining}，不在退款范围内。退款范围：10、20、100次`;
@@ -150,7 +139,7 @@ export async function checkAccessCodeRefund(accessCode: string): Promise<CheckRe
   // 符合退款条件
   result.eligible = true;
   result.refundPercentage = 100;
-  result.reason = "Access code 完全未使用，可全额退款";
+  result.reason = "Access code 剩余次数符合退款条件，可全额退款";
 
   return result;
 }
