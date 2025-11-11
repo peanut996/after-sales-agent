@@ -1,14 +1,13 @@
-# 售后订单处理 Agent
+# Access Code 退款资格检查 Agent
 
-基于 Claude Agent SDK 开发的智能售后订单处理系统。
+基于 Claude Agent SDK 开发的智能Access Code退款资格检查系统。
 
 ## 功能特性
 
-- 📦 订单查询：快速查询订单详细信息
-- 🔄 退换货处理：支持退货和换货申请处理
-- 💰 退款处理：自动化退款流程管理
-- 📊 订单状态更新：实时更新订单状态
-- 👤 客户历史查询：查看客户历史订单记录
+- 🔍 **Access Code检查**：自动从GhibliFlowStudio链接中提取access code
+- 💰 **退款资格判断**：根据使用次数和状态判断是否可退款
+- 💬 **终端聊天模式**：支持在terminal中直接输入链接进行检查
+- 📊 **详细报告**：提供完整的退款比例和原因分析
 
 ## 项目结构
 
@@ -45,41 +44,87 @@ npm run build
 npm start
 ```
 
+## 使用方法
+
+### 启动Terminal聊天模式
+
+```bash
+npm run dev
+```
+
+或者
+
+```bash
+npm start
+```
+
+### 在Terminal中使用
+
+1. 启动程序后，会看到提示符 `客服助手>`
+2. 直接粘贴 GhibliFlowStudio 链接，例如：
+   ```
+   客服助手> https://ghibliflowstudio.com/?c=c0507bd820
+   ```
+3. 系统会自动提取 access code 并进行查询
+4. 查看退款资格和比例信息
+5. 输入 `exit` 或 `quit` 退出程序
+
 ## 可用工具
 
-### query_order
-查询订单详细信息
-- 参数：order_id, customer_phone（可选）
-- 返回：订单详情
+### check_access_code_refund
+检查 access code 退款资格
+- 参数：access_code（字符串）
+- 返回：详细的退款资格报告，包括：
+  - Access Code
+  - 产品描述
+  - 剩余使用次数
+  - 激活状态
+  - 处理模式
+  - 退款资格（符合/不符合）
+  - 退款比例
+  - 退款原因
 
-### process_return
-处理退换货申请
-- 参数：order_id, reason, item_ids, type（return/exchange）
-- 返回：处理结果
+## 输出示例
 
-### process_refund
-处理退款申请
-- 参数：order_id, amount, reason, refund_method
-- 返回：退款结果
+### 成功示例
+```
+=== Access Code 退款资格检查 Agent ===
+已启动终端聊天模式
+请粘贴 GhibliFlowStudio 链接进行检查
+输入 'exit' 或 'quit' 退出程序
 
-### update_order_status
-更新订单状态
-- 参数：order_id, status, note（可选）
-- 返回：更新结果
+客服助手> https://ghibliflowstudio.com/?c=c0507bd820
 
-### get_customer_history
-获取客户历史订单
-- 参数：customer_id, customer_phone, limit（可选）
-- 返回：历史订单列表
+✅ 检查完成！
+📋 检查结果:
+   - Access Code: c0507bd820
+   - 描述: GhibliFlow Studio Pro - 10次使用
+   - 剩余次数: 10
+   - 状态: 激活
+   - 处理模式: automatic
+   - 退款资格: ✅ 符合
+   - 退款比例: 100%
+   - 原因: Access code 完全未使用，可全额退款
+```
+
+### 失败示例
+```
+❌ 检查失败！
+   - 原因: 该 access code 在系统中未找到
+```
 
 ## 后续开发
 
-1. 集成实际数据库
-2. 添加身份验证
-3. 添加日志记录
-4. 添加单元测试
-5. 添加错误处理和重试机制
-6. 集成外部 API（支付、物流等）
+1. ✅ 自动从URL提取access code
+2. ✅ Terminal聊天模式
+3. 🔄 集成GhibliFlowStudio生产环境API
+4. 📊 增强退款比例计算逻辑（基于实际使用次数）
+5. 🔐 添加API认证机制
+6. 📝 添加详细日志记录
+7. 🧪 添加单元测试
+8. 💾 实现数据缓存机制
+9. 🔄 添加错误处理和重试机制
+10. 📈 添加使用统计和报告功能
 
 ## 许可证
 
