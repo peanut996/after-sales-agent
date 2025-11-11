@@ -26,16 +26,44 @@ export async function fetchAccessCodeInfo(code: string): Promise<AccessCodeInfo 
     console.log(`🔑 使用 API Token: ${API_TOKEN ? `${API_TOKEN.substring(0, 10)}...` : '未设置'}`);
 
     const response = await fetch(`${API_BASE_URL}/access-codes/${code}`, {
+      method: "GET",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${API_TOKEN}`
+        "Accept": "application/json",
+        "Authorization": `Bearer ${API_TOKEN}`,
+        "User-Agent": "AfterSalesAgent/1.0.0"
       }
     });
 
     console.log(`📥 响应状态: ${response.status} ${response.statusText}`);
     console.log(`📋 响应头:`, Object.fromEntries(response.headers.entries()));
 
-    const data = await response.json() as { success: boolean; data: AccessCodeInfo };
+    // 检查响应状态
+    if (!response.ok) {
+      console.error(`❌ API 请求失败: ${response.status} ${response.statusText}`);
+      const contentType = response.headers.get('content-type') || '';
+      if (contentType.includes('text/html')) {
+        console.error('⚠️  服务器返回了 HTML 页面而不是 JSON，可能是:');
+        console.error('   - API 端点不存在或已更改');
+        console.error('   - 代理服务器阻止了请求');
+        console.error('   - 需要额外的认证或配置');
+      }
+      return null;
+    }
+
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      console.error(`⚠️  响应类型错误: ${contentType}`);
+      return null;
+    }
+
+    let data: { success: boolean; data: AccessCodeInfo };
+    try {
+      data = await response.json() as { success: boolean; data: AccessCodeInfo };
+    } catch (parseError) {
+      console.error('❌ JSON 解析失败:', parseError);
+      return null;
+    }
 
     console.log(`📊 响应内容:`, JSON.stringify(data, null, 2));
 

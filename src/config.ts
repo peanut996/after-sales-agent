@@ -7,7 +7,10 @@ import type { HookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
 export const QUERY_OPTIONS = {
   maxTurns: 5,
   model: "opus" as const,
-  allowedTools: ["check_access_code_refund"] as string[]
+  allowedTools: [
+    "mcp__after_sales_tools__check_access_code_refund",
+    "mcp__browser_simulator__simulate_browser_access"
+  ] as string[]
 };
 
 /**
@@ -78,10 +81,27 @@ export const SECURITY_HOOKS = {
 export const CHECK_TOOL_SECURITY_HOOKS = {
   PreToolUse: [
     {
-      matcher: "check_access_code_refund" as const,
+      matcher: "mcp__after_sales_tools__check_access_code_refund" as const,
       hooks: [
         async (input: any): Promise<HookJSONOutput> => {
           // 添加安全检查
+          return { continue: true };
+        }
+      ]
+    },
+    {
+      matcher: "mcp__browser_simulator__simulate_browser_access" as const,
+      hooks: [
+        async (input: any): Promise<HookJSONOutput> => {
+          const url = input.tool_input?.url;
+          // 只允许访问 *.ghibliflowstudio.com 域名
+          if (url && !url.includes('ghibliflowstudio.com')) {
+            return {
+              decision: 'block',
+              stopReason: `只允许访问 ghibliflowstudio.com 域名，禁止访问: ${url}`,
+              continue: false
+            };
+          }
           return { continue: true };
         }
       ]
