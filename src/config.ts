@@ -6,9 +6,7 @@ import type { HookJSONOutput } from "@anthropic-ai/claude-agent-sdk";
  */
 export const QUERY_OPTIONS = {
   maxTurns: 5,
-  cwd: path.join(process.cwd(), 'agent'),
   model: "opus" as const,
-  executable: "node" as const,
   allowedTools: ["check_access_code_refund"] as string[]
 };
 
