@@ -223,12 +223,12 @@ function getSession(sessionId: string): SessionInfo | undefined {
   return sessions.find(s => s.id === sessionId);
 }
 
-// Query 模式 - 使用 Claude Agent + Tool
+// Query 模式 - 使用售后订单助手 + Tool
 async function startQueryMode(resumeSessionId?: string) {
   console.log("\n" + "=".repeat(50));
-  console.log("🤖 售后订单助手 - Claude Agent + Tool 模式");
+  console.log("🤖 售后订单助手 - 智能查询模式");
   console.log("=".repeat(50));
-  console.log("使用 Claude Agent SDK + 注册工具进行智能查询");
+  console.log("使用智能 SDK + 注册工具进行查询");
   console.log("💡 提示：粘贴文本会保留换行，键盘按 Enter 提交\n");
 
   if (resumeSessionId) {
@@ -251,10 +251,10 @@ async function startQueryMode(resumeSessionId?: string) {
       process.exit(0);
     }
 
-    console.log("🤖 Claude Agent 正在处理...\n");
+    console.log("🤖 售后订单助手正在处理...\n");
 
     try {
-      // 使用 SDK 的 query 功能（Claude Agent + Tool）
+      // 使用 SDK 的 query 功能
       const q = query({
         prompt: createQueryPrompt(message),
         options: {
@@ -284,7 +284,7 @@ async function startQueryMode(resumeSessionId?: string) {
         if (msg.type === 'assistant' && msg.message) {
           const textContent = msg.message.content.find((c: any) => c.type === 'text');
           if (textContent && 'text' in textContent) {
-            console.log(`🤖 Claude Agent: ${textContent.text}\n`);
+            console.log(`🤖 售后订单助手: ${textContent.text}\n`);
           }
         }
       }
@@ -471,10 +471,10 @@ async function main() {
     if (session.mode === "query") {
       await startQueryMode(resumeSessionId);
     } else {
-      await startConversationMode(resumeSessionId);
+      await startQueryMode(resumeSessionId);
     }
   } else {
-    // 默认启动 Query 模式（使用 Claude Agent）
+    // 默认启动 Query 模式
     await startQueryMode();
   }
 }
