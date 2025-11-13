@@ -17,6 +17,8 @@ function createMultilineInput(onSubmit: (message: string) => Promise<void>, prom
   let inputBuffer = "";
   let cursorPosition = 0;
   let isProcessing = false;
+  let lastInputTime = 0;
+  let pasteMode = false;
 
   // 设置原始模式以捕获特殊键
   if (process.stdin.isTTY) {
@@ -64,6 +66,16 @@ function createMultilineInput(onSubmit: (message: string) => Promise<void>, prom
   // 监听键盘输入
   const keyHandler = async (key: Buffer) => {
     const byte = key[0];
+    const now = Date.now();
+    
+    // 检测粘贴：如果两次输入间隔小于 10ms，认为是粘贴
+    if (now - lastInputTime < 10) {
+      pasteMode = true;
+    } else if (now - lastInputTime > 100) {
+      // 超过 100ms，退出粘贴模式
+      pasteMode = false;
+    }
+    lastInputTime = now;
     
     // Ctrl+C
     if (byte === 0x03) {
@@ -87,21 +99,16 @@ function createMultilineInput(onSubmit: (message: string) => Promise<void>, prom
     
     // Enter 键处理
     if (key.length === 1 && byte === 0x0D) {
-      // 普通 Enter - 添加换行
-      inputBuffer = inputBuffer.slice(0, cursorPosition) + '\n' + inputBuffer.slice(cursorPosition);
-      cursorPosition++;
-      console.log("");
-      process.stdout.write(promptText);
-      return;
-    }
-    
-    // Shift+Enter - 提交
-    // 在大多数终端中，Shift+Enter 会发送 ESC [ 1 3 ; 2 u 或其他序列
-    // 但最可靠的是检测 Enter 的变体
-    // 实际上很多终端不支持 Shift+Enter，我们改用 Ctrl+Enter
-    // Ctrl+Enter 通常发送 0x0A (LF)
-    if (key.length === 1 && byte === 0x0A) {
-      await handleInput();
+      if (pasteMode) {
+        // 粘贴模式：添加换行
+        inputBuffer = inputBuffer.slice(0, cursorPosition) + '\n' + inputBuffer.slice(cursorPosition);
+        cursorPosition++;
+        console.log("");
+        process.stdout.write(promptText);
+      } else {
+        // 键盘输入：提交
+        await handleInput();
+      }
       return;
     }
     
@@ -222,7 +229,7 @@ async function startQueryMode(resumeSessionId?: string) {
   console.log("🤖 售后订单助手 - Claude Agent + Tool 模式");
   console.log("=".repeat(50));
   console.log("使用 Claude Agent SDK + 注册工具进行智能查询");
-  console.log("💡 提示：Enter 换行，Ctrl+Enter 提交\n");
+  console.log("💡 提示：粘贴文本会保留换行，键盘按 Enter 提交\n");
 
   if (resumeSessionId) {
     const session = getSession(resumeSessionId);
@@ -310,7 +317,7 @@ async function startConversationMode(resumeSessionId?: string) {
   console.log("  1. 检查 access code 退款资格");
   console.log("  2. 回答相关问题");
   console.log("\n输入 'quit' 或 'exit' 退出对话");
-  console.log("💡 提示：Enter 换行，Ctrl+Enter 提交");
+  console.log("💡 提示：粘贴文本会保留换行，键盘按 Enter 提交");
   console.log("-".repeat(50) + "\n");
 
   if (resumeSessionId) {
