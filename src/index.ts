@@ -85,23 +85,23 @@ function createMultilineInput(onSubmit: (message: string) => Promise<void>, prom
     
     const str = key.toString();
     
-    // Enter - 检查是否连续两次（空行提交）
+    // Enter 键处理
     if (key.length === 1 && byte === 0x0D) {
-      // 如果当前行为空或只有空格，提交
-      const currentLineStart = inputBuffer.lastIndexOf('\n') + 1;
-      const currentLine = inputBuffer.slice(currentLineStart, cursorPosition);
-      
-      if (currentLine.trim() === '' && inputBuffer.trim() !== '') {
-        // 空行且有内容，提交
-        await handleInput();
-        return;
-      }
-      
-      // 否则添加换行
+      // 普通 Enter - 添加换行
       inputBuffer = inputBuffer.slice(0, cursorPosition) + '\n' + inputBuffer.slice(cursorPosition);
       cursorPosition++;
       console.log("");
       process.stdout.write(promptText);
+      return;
+    }
+    
+    // Shift+Enter - 提交
+    // 在大多数终端中，Shift+Enter 会发送 ESC [ 1 3 ; 2 u 或其他序列
+    // 但最可靠的是检测 Enter 的变体
+    // 实际上很多终端不支持 Shift+Enter，我们改用 Ctrl+Enter
+    // Ctrl+Enter 通常发送 0x0A (LF)
+    if (key.length === 1 && byte === 0x0A) {
+      await handleInput();
       return;
     }
     
@@ -222,7 +222,7 @@ async function startQueryMode(resumeSessionId?: string) {
   console.log("🤖 售后订单助手 - Claude Agent + Tool 模式");
   console.log("=".repeat(50));
   console.log("使用 Claude Agent SDK + 注册工具进行智能查询");
-  console.log("💡 提示：输入内容后按空行（连续两次 Enter）提交\n");
+  console.log("💡 提示：Enter 换行，Ctrl+Enter 提交\n");
 
   if (resumeSessionId) {
     const session = getSession(resumeSessionId);
@@ -310,7 +310,7 @@ async function startConversationMode(resumeSessionId?: string) {
   console.log("  1. 检查 access code 退款资格");
   console.log("  2. 回答相关问题");
   console.log("\n输入 'quit' 或 'exit' 退出对话");
-  console.log("💡 提示：输入内容后按空行（连续两次 Enter）提交");
+  console.log("💡 提示：Enter 换行，Ctrl+Enter 提交");
   console.log("-".repeat(50) + "\n");
 
   if (resumeSessionId) {
