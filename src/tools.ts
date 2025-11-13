@@ -62,20 +62,7 @@ export const checkAccessCodeRefundTool = tool(
       }
 
       const codeInfo = data.data;
-      const validRefundAmounts = [10, 20, 100];
-
-      let eligible = false;
-      let refundPercentage = 0;
-      let reason = "";
-
-      if (validRefundAmounts.includes(codeInfo.usesRemaining)) {
-        eligible = true;
-        refundPercentage = 100;
-        reason = "Access code 剩余次数符合退款条件，可全额退款";
-      } else {
-        reason = `Access code 剩余次数为 ${codeInfo.usesRemaining}，不在退款范围内。退款范围：10、20、100次`;
-      }
-
+      
       // 计算已使用次数（默认按10次计算总次数）
       const initialUses = codeInfo.initialUses || 10;
       const remainingUses = codeInfo.usesRemaining;
@@ -85,6 +72,20 @@ export const checkAccessCodeRefundTool = tool(
       const pricePerUse = 0.5;
       const totalPrice = initialUses * pricePerUse;
       const refundAmount = remainingUses * pricePerUse;
+      
+      // 根据剩余次数计算退款比例
+      const refundPercentage = initialUses > 0 ? Math.round((remainingUses / initialUses) * 100) : 0;
+
+      const validRefundAmounts = [10, 20, 100];
+      let eligible = false;
+      let reason = "";
+
+      if (validRefundAmounts.includes(remainingUses)) {
+        eligible = true;
+        reason = `Access code 剩余 ${remainingUses} 次，符合退款条件，可退款 ${refundPercentage}%（¥${refundAmount}）`;
+      } else {
+        reason = `Access code 剩余次数为 ${remainingUses}，不在退款范围内。退款范围：10、20、100次`;
+      }
 
       const result = {
         success: true,
