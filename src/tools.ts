@@ -287,8 +287,6 @@ export const deactivateAccessCodeTool = tool(
         })
       });
 
-      console.log(`📥 响应状态: ${response.status} ${response.statusText}`);
-
       if (!response.ok) {
         return {
           content: [

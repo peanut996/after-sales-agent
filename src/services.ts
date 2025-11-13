@@ -35,9 +35,6 @@ export async function fetchAccessCodeInfo(code: string): Promise<AccessCodeInfo 
       }
     });
 
-    console.log(`📥 响应状态: ${response.status} ${response.statusText}`);
-    console.log(`📋 响应头:`, Object.fromEntries(response.headers.entries()));
-
     // 检查响应状态
     if (!response.ok) {
       console.error(`❌ API 请求失败: ${response.status} ${response.statusText}`);
