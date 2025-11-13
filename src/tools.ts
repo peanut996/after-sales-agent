@@ -6,19 +6,19 @@ import { z } from "zod";
  */
 export const checkAccessCodeRefundTool = tool(
   "check_access_code_refund",
-  "检查 access code 退款资格。该工具会模拟浏览器访问 API 获取 access code 状态，避免代理拦截。如果符合退款条件，会返回详细的退款信息和比例。",
+  "查询 access code 使用信息。该工具会获取 access code 的使用状态和剩余次数，用于判断退款资格。",
   {
-    access_code: z.string().describe("需要检查的 access code")
+    access_code: z.string().describe("需要查询的 access code")
   },
   async ({ access_code }: { access_code: string }) => {
-    console.log(`\n🔍 正在检查 access code: ${access_code}...`);
+    console.log(`\n🔍 正在查询使用信息: ${access_code}...`);
 
     try {
       // 模拟浏览器访问 API
       const API_BASE_URL = "https://ghibliflowstudio.com/api";
       const API_TOKEN = process.env.GHIBLI_API_TOKEN;
 
-      console.log(`📡 使用模拟浏览器访问: ${API_BASE_URL}/access-codes/${access_code}`);
+      console.log(`📡 查询使用信息: ${API_BASE_URL}/access-codes/${access_code}`);
 
       const response = await fetch(`${API_BASE_URL}/access-codes/${access_code}`, {
         method: "GET",
@@ -101,14 +101,14 @@ export const checkAccessCodeRefundTool = tool(
         refundAmount
       };
 
-      console.log("✅ 检查完成！");
-      console.log("📋 检查结果:", JSON.stringify(result, null, 2));
+      console.log("✅ 查询完成！");
+      console.log("📋 使用信息:", JSON.stringify(result, null, 2));
 
       return {
         content: [
           {
             type: "text" as const,
-            text: `检查结果：
+            text: `查询结果：
 - Access Code: ${result.code}
 - 总次数: ${result.initialUses} 次
 - 已使用: ${result.usedTimes} 次
@@ -125,13 +125,13 @@ export const checkAccessCodeRefundTool = tool(
 
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      console.error("❌ 检查过程中发生错误:", errorMessage);
+      console.error("❌ 查询过程中发生错误:", errorMessage);
 
       return {
         content: [
           {
             type: "text" as const,
-            text: `检查过程中发生错误: ${errorMessage}`
+            text: `查询过程中发生错误: ${errorMessage}`
           }
         ]
       };
@@ -140,11 +140,11 @@ export const checkAccessCodeRefundTool = tool(
 );
 
 /**
- * 模拟浏览器访问 API 工具
+ * 查询 API 工具
  */
 export const simulateBrowserTool = tool(
   "simulate_browser_access",
-  "模拟浏览器访问 API，避免代理拦截。通过设置 User-Agent、Cookie 和 Referer 来模拟真实浏览器行为。",
+  "查询 API 接口，获取数据信息。通过标准 HTTP 请求获取所需数据。",
   {
     url: z.string().describe("要访问的 URL"),
     method: z.string().default("GET").describe("HTTP 方法"),
@@ -153,7 +153,7 @@ export const simulateBrowserTool = tool(
   },
   async ({ url, method = "GET", headers = {}, data }: { url: string; method?: string; headers?: Record<string, string>; data?: any }) => {
     try {
-      console.log(`\n🌐 模拟浏览器访问: ${url}`);
+      console.log(`\n🌐 查询 API: ${url}`);
 
       const response = await fetch(url, {
         method,
@@ -191,7 +191,7 @@ export const simulateBrowserTool = tool(
         content: [
           {
             type: "text" as const,
-            text: `浏览器访问结果：
+            text: `查询结果：
 状态: ${response.status}
 内容类型: ${contentType}
 响应数据: ${JSON.stringify(result, null, 2)}`
@@ -204,7 +204,7 @@ export const simulateBrowserTool = tool(
         content: [
           {
             type: "text" as const,
-            text: `浏览器访问失败: ${errorMessage}`
+            text: `查询失败: ${errorMessage}`
           }
         ]
       };
