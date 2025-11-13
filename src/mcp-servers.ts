@@ -1,5 +1,12 @@
-import { createSdkMcpServer, McpStdioServerConfig } from "@anthropic-ai/claude-agent-sdk";
-import { checkAccessCodeRefundTool, simulateBrowserTool, deactivateAccessCodeTool } from "./tools";
+import {
+  createSdkMcpServer,
+  McpStdioServerConfig,
+} from "@anthropic-ai/claude-agent-sdk";
+import {
+  checkAccessCodeRefundTool,
+  simulateBrowserTool,
+  deactivateAccessCodeTool,
+} from "./tools";
 
 /**
  * 创建售后工具 MCP 服务器
@@ -7,37 +14,27 @@ import { checkAccessCodeRefundTool, simulateBrowserTool, deactivateAccessCodeToo
 const customMcpServer = createSdkMcpServer({
   name: "after_sales_tools",
   version: "1.0.0",
-  tools: [checkAccessCodeRefundTool]
-});
-
-/**
- * 创建浏览器模拟器 MCP 服务器
- */
-const browserMcpServer = createSdkMcpServer({
-  name: "browser_simulator",
-  version: "1.0.0",
-  tools: [simulateBrowserTool, deactivateAccessCodeTool]
+  tools: [checkAccessCodeRefundTool, deactivateAccessCodeTool],
 });
 
 /**
  * Chrome MCP Stdio 服务器配置
  */
 const chromeMcp: McpStdioServerConfig = {
-  type: 'stdio',
+  type: "stdio",
   command: "npx",
   args: [
     "node",
-    "/Users/peanut996/.nvm/versions/node/v22.21.0/lib/node_modules/mcp-chrome-bridge/dist/mcp/mcp-server-stdio.js"
-  ]
+    "/Users/peanut996/.nvm/versions/node/v22.21.0/lib/node_modules/mcp-chrome-bridge/dist/mcp/mcp-server-stdio.js",
+  ],
 };
 
 /**
  * 所有 MCP 服务器的集合
  */
 export const mcpServers = {
-  "after_sales_tools": customMcpServer,
-  "browser_simulator": browserMcpServer,
-  "chrome-mcp-stdio": chromeMcp
+  after_sales_tools: customMcpServer,
+  chrome_mcp_stdio: chromeMcp,
 };
 
 /**
@@ -47,9 +44,7 @@ export const allowedMcpServerTools = [
   // After Sales Tools
   "mcp__after_sales_tools__check_access_code_refund",
 
-  // Browser Simulator
-  "mcp__browser_simulator__simulate_browser_access",
-  "mcp__browser_simulator__deactivate_access_code",
+  "mcp__after_sales_tools__deactivate_access_code",
 
   // Chrome MCP Stdio - 浏览器管理
   "mcp__chrome_mcp_stdio__get_windows_and_tabs",
@@ -82,5 +77,5 @@ export const allowedMcpServerTools = [
   "mcp__chrome_mcp_stdio__chrome_history",
   "mcp__chrome_mcp_stdio__chrome_bookmark_search",
   "mcp__chrome_mcp_stdio__chrome_bookmark_add",
-  "mcp__chrome_mcp_stdio__chrome_bookmark_delete"
+  "mcp__chrome_mcp_stdio__chrome_bookmark_delete",
 ];

@@ -8,7 +8,7 @@ export const checkAccessCodeRefundTool = tool(
   "check_access_code_refund",
   "查询 access code 使用信息。该工具会获取 access code 的使用状态和剩余次数，用于判断退款资格。",
   {
-    access_code: z.string().describe("需要查询的 access code")
+    access_code: z.string().describe("需要查询的 access code"),
   },
   async ({ access_code }: { access_code: string }) => {
     try {
@@ -16,46 +16,50 @@ export const checkAccessCodeRefundTool = tool(
       const API_BASE_URL = "https://ghibliflowstudio.com/api";
       const API_TOKEN = process.env.GHIBLI_API_TOKEN;
 
-      const response = await fetch(`${API_BASE_URL}/access-codes/${access_code}`, {
-        method: "GET",
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept": "application/json",
-          "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-          "Referer": "https://ghibliflowstudio.com/",
-          "Origin": "https://ghibliflowstudio.com",
-          "Authorization": `Bearer ${API_TOKEN}`,
-          "Cache-Control": "no-cache",
-          "Pragma": "no-cache"
-        }
-      });
+      const response = await fetch(
+        `${API_BASE_URL}/access-codes/${access_code}`,
+        {
+          method: "GET",
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            Accept: "application/json",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            Referer: "https://ghibliflowstudio.com/",
+            Origin: "https://ghibliflowstudio.com",
+            Authorization: `Bearer ${API_TOKEN}`,
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        },
+      );
 
       if (!response.ok) {
         return {
           content: [
             {
               type: "text" as const,
-              text: `检查失败：API 返回 ${response.status} 错误。可能是 access code 不存在或 API 权限不足。`
-            }
-          ]
+              text: `检查失败：API 返回 ${response.status} 错误。可能是 access code 不存在或 API 权限不足。`,
+            },
+          ],
         };
       }
 
-      const data = await response.json() as { success: boolean; data: any };
+      const data = (await response.json()) as { success: boolean; data: any };
 
       if (!data.success) {
         return {
           content: [
             {
               type: "text" as const,
-              text: `检查失败：API 返回失败状态。`
-            }
-          ]
+              text: `检查失败：API 返回失败状态。`,
+            },
+          ],
         };
       }
 
       const codeInfo = data.data;
-      
+
       // 计算已使用次数（默认按10次计算总次数）
       const initialUses = codeInfo.initialUses || 10;
       const remainingUses = codeInfo.usesRemaining;
@@ -65,9 +69,10 @@ export const checkAccessCodeRefundTool = tool(
       const pricePerUse = 0.5;
       const totalPrice = initialUses * pricePerUse;
       const refundAmount = remainingUses * pricePerUse;
-      
+
       // 根据剩余次数计算退款比例
-      const refundPercentage = initialUses > 0 ? Math.round((remainingUses / initialUses) * 100) : 0;
+      const refundPercentage =
+        initialUses > 0 ? Math.round((remainingUses / initialUses) * 100) : 0;
 
       const validRefundAmounts = [10, 20, 100];
       let eligible = false;
@@ -92,7 +97,7 @@ export const checkAccessCodeRefundTool = tool(
         refundPercentage,
         reason,
         totalPrice,
-        refundAmount
+        refundAmount,
       };
 
       return {
@@ -109,25 +114,25 @@ export const checkAccessCodeRefundTool = tool(
 - 退款资格: ${result.eligible ? "符合" : "不符合"}
 - 退款比例: ${result.refundPercentage}%
 - 价格信息: 总价¥${result.totalPrice}，可退款¥${result.refundAmount}
-- 原因: ${result.reason}`
-          }
-        ]
+- 原因: ${result.reason}`,
+          },
+        ],
       };
-
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       console.error("❌ 查询过程中发生错误:", errorMessage);
 
       return {
         content: [
           {
             type: "text" as const,
-            text: `查询过程中发生错误: ${errorMessage}`
-          }
-        ]
+            text: `查询过程中发生错误: ${errorMessage}`,
+          },
+        ],
       };
     }
-  }
+  },
 );
 
 /**
@@ -140,42 +145,55 @@ export const simulateBrowserTool = tool(
     url: z.string().describe("要访问的 URL"),
     method: z.string().default("GET").describe("HTTP 方法"),
     headers: z.record(z.string()).optional().describe("自定义请求头"),
-    data: z.any().optional().describe("请求体数据")
+    data: z.any().optional().describe("请求体数据"),
   },
-  async ({ url, method = "GET", headers = {}, data }: { url: string; method?: string; headers?: Record<string, string>; data?: any }) => {
+  async ({
+    url,
+    method = "GET",
+    headers = {},
+    data,
+  }: {
+    url: string;
+    method?: string;
+    headers?: Record<string, string>;
+    data?: any;
+  }) => {
     try {
       console.log(`\n🌐 查询 API: ${url}`);
 
       const response = await fetch(url, {
         method,
         headers: {
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+          "User-Agent":
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          Accept:
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
           "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
           "Accept-Encoding": "gzip, deflate, br",
-          "DNT": "1",
-          "Connection": "keep-alive",
+          DNT: "1",
+          Connection: "keep-alive",
           "Upgrade-Insecure-Requests": "1",
           "Sec-Fetch-Dest": "document",
           "Sec-Fetch-Mode": "navigate",
           "Sec-Fetch-Site": "none",
           "Sec-Fetch-User": "?1",
-          "sec-ch-ua": '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+          "sec-ch-ua":
+            '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
           "sec-ch-ua-mobile": "?0",
           "sec-ch-ua-platform": '"macOS"',
-          ...headers
+          ...headers,
         },
-        body: data ? JSON.stringify(data) : undefined
+        body: data ? JSON.stringify(data) : undefined,
       });
 
-      const contentType = response.headers.get('content-type') || '';
+      const contentType = response.headers.get("content-type") || "";
       let result: any;
 
-      if (contentType.includes('application/json')) {
+      if (contentType.includes("application/json")) {
         result = await response.json();
       } else {
         const text = await response.text();
-        result = { html: text.substring(0, 500) + '...' };
+        result = { html: text.substring(0, 500) + "..." };
       }
 
       return {
@@ -185,22 +203,23 @@ export const simulateBrowserTool = tool(
             text: `查询结果：
 状态: ${response.status}
 内容类型: ${contentType}
-响应数据: ${JSON.stringify(result, null, 2)}`
-          }
-        ]
+响应数据: ${JSON.stringify(result, null, 2)}`,
+          },
+        ],
       };
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       return {
         content: [
           {
             type: "text" as const,
-            text: `查询失败: ${errorMessage}`
-          }
-        ]
+            text: `查询失败: ${errorMessage}`,
+          },
+        ],
       };
     }
-  }
+  },
 );
 
 /**
@@ -211,48 +230,64 @@ export const deactivateAccessCodeTool = tool(
   "停用 access code，将其状态设置为 inactive。这是退款操作的必要步骤，将使该 access code 无法继续使用。",
   {
     access_code: z.string().describe("需要停用的 access code"),
-    reason: z.string().optional().describe("停用原因，如 'user_refund_request'")
+    reason: z
+      .string()
+      .optional()
+      .describe("停用原因，如 'user_refund_request'"),
   },
-  async ({ access_code, reason = "user_refund_request" }: { access_code: string; reason?: string }) => {
+  async ({
+    access_code,
+    reason = "user_refund_request",
+  }: {
+    access_code: string;
+    reason?: string;
+  }) => {
     try {
       const API_BASE_URL = "https://ghibliflowstudio.com/api";
       const API_TOKEN = process.env.GHIBLI_API_TOKEN;
 
       // 首先获取 access code 的当前状态和使用信息
-      const getResponse = await fetch(`${API_BASE_URL}/access-codes/${access_code}`, {
-        method: "GET",
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Accept": "application/json",
-          "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-          "Referer": "https://ghibliflowstudio.com/",
-          "Origin": "https://ghibliflowstudio.com",
-          "Authorization": `Bearer ${API_TOKEN}`,
-          "Cache-Control": "no-cache",
-          "Pragma": "no-cache"
-        }
-      });
+      const getResponse = await fetch(
+        `${API_BASE_URL}/access-codes/${access_code}`,
+        {
+          method: "GET",
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            Accept: "application/json",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            Referer: "https://ghibliflowstudio.com/",
+            Origin: "https://ghibliflowstudio.com",
+            Authorization: `Bearer ${API_TOKEN}`,
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        },
+      );
 
       if (!getResponse.ok) {
         return {
           content: [
             {
               type: "text" as const,
-              text: `❌ 获取 access code 信息失败：API 返回 ${getResponse.status} 错误。`
-            }
-          ]
+              text: `❌ 获取 access code 信息失败：API 返回 ${getResponse.status} 错误。`,
+            },
+          ],
         };
       }
 
-      const getData = await getResponse.json() as { success: boolean; data: any };
+      const getData = (await getResponse.json()) as {
+        success: boolean;
+        data: any;
+      };
       if (!getData.success || !getData.data) {
         return {
           content: [
             {
               type: "text" as const,
-              text: `❌ Access code ${access_code} 不存在或无效。`
-            }
-          ]
+              text: `❌ Access code ${access_code} 不存在或无效。`,
+            },
+          ],
         };
       }
 
@@ -268,46 +303,50 @@ export const deactivateAccessCodeTool = tool(
       const refundAmount = remainingUses * pricePerUse;
 
       // 然后执行停用操作
-      const response = await fetch(`${API_BASE_URL}/access-codes/${access_code}`, {
-        method: "PATCH",
-        headers: {
-          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-          "Content-Type": "application/json",
-          "Accept": "application/json",
-          "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
-          "Referer": "https://ghibliflowstudio.com/",
-          "Origin": "https://ghibliflowstudio.com",
-          "Authorization": `Bearer ${API_TOKEN}`,
-          "Cache-Control": "no-cache",
-          "Pragma": "no-cache"
+      const response = await fetch(
+        `${API_BASE_URL}/access-codes/${access_code}`,
+        {
+          method: "PATCH",
+          headers: {
+            "User-Agent":
+              "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Content-Type": "application/json",
+            Accept: "application/json",
+            "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+            Referer: "https://ghibliflowstudio.com/",
+            Origin: "https://ghibliflowstudio.com",
+            Authorization: `Bearer ${API_TOKEN}`,
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+          body: JSON.stringify({
+            isActive: false,
+            reason: reason,
+          }),
         },
-        body: JSON.stringify({
-          isActive: false,
-          reason: reason
-        })
-      });
+      );
 
       if (!response.ok) {
         return {
           content: [
             {
               type: "text" as const,
-              text: `❌ 停用失败：API 返回 ${response.status} 错误。可能是 access code 不存在、权限不足或已经被停用。`
-            }
-          ]
+              text: `❌ 停用失败：API 返回 ${response.status} 错误。可能是 access code 不存在、权限不足或已经被停用。`,
+            },
+          ],
         };
       }
 
-      const data = await response.json() as { success: boolean; data?: any };
+      const data = (await response.json()) as { success: boolean; data?: any };
 
       if (!data.success) {
         return {
           content: [
             {
               type: "text" as const,
-              text: `❌ 停用失败：API 返回失败状态。`
-            }
-          ]
+              text: `❌ 停用失败：API 返回失败状态。`,
+            },
+          ],
         };
       }
 
@@ -333,23 +372,23 @@ Access Code: ${access_code}
 停用原因: ${reason}
 时间: ${new Date().toLocaleString()}
 
-该 access code 已无法继续使用，退款操作已完成。`
-          }
-        ]
+该 access code 已无法继续使用，退款操作已完成。`,
+          },
+        ],
       };
-
     } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
       console.error("❌ 停用过程中发生错误:", errorMessage);
 
       return {
         content: [
           {
             type: "text" as const,
-            text: `❌ 停用过程中发生错误: ${errorMessage}`
-          }
-        ]
+            text: `❌ 停用过程中发生错误: ${errorMessage}`,
+          },
+        ],
       };
     }
-  }
+  },
 );
