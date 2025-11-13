@@ -15,6 +15,9 @@ build/
 .env.test.local
 .env.production.local
 
+# Session 数据
+.sessions/
+
 # IDE
 .vscode/
 .idea/

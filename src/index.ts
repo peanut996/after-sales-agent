@@ -1,17 +1,78 @@
 import { query } from "@anthropic-ai/claude-agent-sdk";
 import readline from "readline";
+import fs from "fs";
+import path from "path";
 
 import { CONVERSATION_SYSTEM_PROMPT, createQueryPrompt, DEFAULT_RESPONSES, isExitCommand } from "./prompts";
 import { QUERY_OPTIONS, CHECK_TOOL_SECURITY_HOOKS } from "./config";
-import type { ConversationMessage } from "./types";
+import type { ConversationMessage, SessionInfo } from "./types";
 import { mcpServers, allowedMcpServerTools } from "./mcp-servers";
 
+// Session 存储路径
+const SESSION_DIR = path.join(process.cwd(), ".sessions");
+const SESSION_FILE = path.join(SESSION_DIR, "sessions.json");
+
+// 确保 session 目录存在
+function ensureSessionDir() {
+  if (!fs.existsSync(SESSION_DIR)) {
+    fs.mkdirSync(SESSION_DIR, { recursive: true });
+  }
+}
+
+// 保存 session
+function saveSession(sessionInfo: SessionInfo) {
+  ensureSessionDir();
+  const sessions: SessionInfo[] = loadSessions();
+  const existingIndex = sessions.findIndex(s => s.id === sessionInfo.id);
+  
+  if (existingIndex >= 0) {
+    sessions[existingIndex] = sessionInfo;
+  } else {
+    sessions.push(sessionInfo);
+  }
+  
+  fs.writeFileSync(SESSION_FILE, JSON.stringify(sessions, null, 2));
+}
+
+// 加载所有 sessions
+function loadSessions(): SessionInfo[] {
+  ensureSessionDir();
+  if (!fs.existsSync(SESSION_FILE)) {
+    return [];
+  }
+  
+  try {
+    const data = fs.readFileSync(SESSION_FILE, "utf-8");
+    return JSON.parse(data);
+  } catch {
+    return [];
+  }
+}
+
+// 获取 session
+function getSession(sessionId: string): SessionInfo | undefined {
+  const sessions = loadSessions();
+  return sessions.find(s => s.id === sessionId);
+}
+
 // Query 模式 - 使用 Claude Agent + Tool
-async function startQueryMode() {
+async function startQueryMode(resumeSessionId?: string) {
   console.log("\n" + "=".repeat(50));
   console.log("🤖 售后订单助手 - Claude Agent + Tool 模式");
   console.log("=".repeat(50));
   console.log("使用 Claude Agent SDK + 注册工具进行智能查询\n");
+
+  if (resumeSessionId) {
+    const session = getSession(resumeSessionId);
+    if (session) {
+      console.log(`📂 恢复 Session: ${resumeSessionId}`);
+      console.log(`   创建时间: ${new Date(session.createdAt).toLocaleString()}`);
+      console.log(`   最后访问: ${new Date(session.lastAccessedAt).toLocaleString()}\n`);
+    } else {
+      console.log(`⚠️  未找到 Session: ${resumeSessionId}，将创建新 Session\n`);
+      resumeSessionId = undefined;
+    }
+  }
 
   const rl = readline.createInterface({
     input: process.stdin,
@@ -20,6 +81,7 @@ async function startQueryMode() {
   });
 
   let isProcessing = false;
+  let currentSessionId: string | undefined = resumeSessionId;
 
   const processInput = async (input: string) => {
     const message = input.trim();
@@ -54,17 +116,38 @@ async function startQueryMode() {
           allowedTools: allowedMcpServerTools,
           hooks: {
             PreToolUse: CHECK_TOOL_SECURITY_HOOKS.PreToolUse
-          }
+          },
+          ...(currentSessionId && { resume: currentSessionId })
         }
       });
 
       for await (const msg of q) {
-        console.log(message)
+        // 捕获 session ID
+        if (msg.type === 'system' && msg.subtype === 'init') {
+          currentSessionId = msg.session_id;
+          const sessionInfo: SessionInfo = {
+            id: currentSessionId,
+            mode: "query",
+            createdAt: new Date(),
+            lastAccessedAt: new Date()
+          };
+          saveSession(sessionInfo);
+        }
+
         if (msg.type === 'assistant' && msg.message) {
           const textContent = msg.message.content.find((c: any) => c.type === 'text');
           if (textContent && 'text' in textContent) {
             console.log(`🤖 Claude Agent: ${textContent.text}\n`);
           }
+        }
+      }
+
+      // 更新 session 最后访问时间
+      if (currentSessionId) {
+        const session = getSession(currentSessionId);
+        if (session) {
+          session.lastAccessedAt = new Date();
+          saveSession(session);
         }
       }
     } catch (error) {
@@ -90,7 +173,7 @@ async function startQueryMode() {
 }
 
 // 交互式对话模式
-async function startConversationMode() {
+async function startConversationMode(resumeSessionId?: string) {
   console.log("\n" + "=".repeat(50));
   console.log("🤖 售后订单助手 - 对话模式");
   console.log("=".repeat(50));
@@ -100,11 +183,25 @@ async function startConversationMode() {
   console.log("\n输入 'quit' 或 'exit' 退出对话");
   console.log("-".repeat(50) + "\n");
 
+  if (resumeSessionId) {
+    const session = getSession(resumeSessionId);
+    if (session) {
+      console.log(`📂 恢复 Session: ${resumeSessionId}`);
+      console.log(`   创建时间: ${new Date(session.createdAt).toLocaleString()}`);
+      console.log(`   最后访问: ${new Date(session.lastAccessedAt).toLocaleString()}\n`);
+    } else {
+      console.log(`⚠️  未找到 Session: ${resumeSessionId}，将创建新 Session\n`);
+      resumeSessionId = undefined;
+    }
+  }
+
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
     prompt: "👤 您: "
   });
+
+  let currentSessionId: string | undefined = resumeSessionId;
 
   const conversationHistory: ConversationMessage[] = [
     {
@@ -135,17 +232,39 @@ async function startConversationMode() {
           ...QUERY_OPTIONS,
           mcpServers: mcpServers,
           allowedTools: allowedMcpServerTools,
-          hooks: { PreToolUse: CHECK_TOOL_SECURITY_HOOKS.PreToolUse }
+          hooks: { PreToolUse: CHECK_TOOL_SECURITY_HOOKS.PreToolUse },
+          ...(currentSessionId && { resume: currentSessionId })
         }
       });
 
       let assistantText = "";
       for await (const msg of q) {
+        // 捕获 session ID
+        if (msg.type === 'system' && msg.subtype === 'init') {
+          currentSessionId = msg.session_id;
+          const sessionInfo: SessionInfo = {
+            id: currentSessionId,
+            mode: "conversation",
+            createdAt: new Date(),
+            lastAccessedAt: new Date()
+          };
+          saveSession(sessionInfo);
+        }
+
         if (msg.type === "assistant" && msg.message) {
           const textContent = msg.message.content.find((c: any) => c.type === "text");
           if (textContent && "text" in textContent) {
             assistantText += textContent.text;
           }
+        }
+      }
+
+      // 更新 session 最后访问时间
+      if (currentSessionId) {
+        const session = getSession(currentSessionId);
+        if (session) {
+          session.lastAccessedAt = new Date();
+          saveSession(session);
         }
       }
 
@@ -188,15 +307,61 @@ async function startConversationMode() {
   });
 }
 
+// 列出所有 sessions
+function listSessions() {
+  const sessions = loadSessions();
+  if (sessions.length === 0) {
+    console.log("\n📋 暂无保存的 Session\n");
+    return;
+  }
+
+  console.log("\n📋 已保存的 Sessions:");
+  console.log("=".repeat(70));
+  sessions.forEach((session, index) => {
+    console.log(`${index + 1}. ID: ${session.id}`);
+    console.log(`   模式: ${session.mode === "query" ? "Query 模式" : "对话模式"}`);
+    console.log(`   创建时间: ${new Date(session.createdAt).toLocaleString()}`);
+    console.log(`   最后访问: ${new Date(session.lastAccessedAt).toLocaleString()}`);
+    console.log("-".repeat(70));
+  });
+  console.log("");
+}
+
 // 启动主程序
 async function main() {
   // 从命令行参数判断模式
   const args = process.argv.slice(2);
   const mode = args[0];
+  const resumeSessionId = args[1];
+
+  // 列出所有 sessions
+  if (mode === "--list" || mode === "-l") {
+    listSessions();
+    return;
+  }
 
   if (mode === "--chat" || mode === "-c") {
     // 启动对话模式（直接调用函数）
-    await startConversationMode();
+    await startConversationMode(resumeSessionId);
+  } else if (mode === "--resume" || mode === "-r") {
+    // 恢复 session
+    if (!resumeSessionId) {
+      console.log("❌ 请提供 Session ID");
+      console.log("使用方式: npm run dev -- --resume <session-id>");
+      listSessions();
+      return;
+    }
+    const session = getSession(resumeSessionId);
+    if (!session) {
+      console.log(`❌ 未找到 Session: ${resumeSessionId}`);
+      listSessions();
+      return;
+    }
+    if (session.mode === "query") {
+      await startQueryMode(resumeSessionId);
+    } else {
+      await startConversationMode(resumeSessionId);
+    }
   } else {
     // 默认启动 Query 模式（使用 Claude Agent）
     await startQueryMode();

@@ -72,3 +72,13 @@ export enum Status {
   PENDING = "pending",
   EXPIRED = "expired"
 }
+
+/**
+ * Session 信息接口
+ */
+export interface SessionInfo {
+  id: string;
+  mode: "query" | "conversation";
+  createdAt: Date;
+  lastAccessedAt: Date;
+}

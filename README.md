@@ -23,40 +23,64 @@ after-sales-agent/
 ## 安装依赖
 
 ```bash
-npm install
+pnpm install
 ```
 
 ## 开发模式
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 ## 构建项目
 
 ```bash
-npm run build
+pnpm build
 ```
 
 ## 启动项目
 
 ```bash
-npm start
+pnpm start
 ```
 
 ## 使用方法
 
-### 启动Terminal聊天模式
+### 1. 启动 Query 模式（默认）
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
-或者
+### 2. 启动对话模式
 
 ```bash
-npm start
+pnpm dev -- --chat
+# 或
+pnpm dev -- -c
 ```
+
+### 3. Session 管理
+
+#### 查看所有已保存的 Sessions
+```bash
+pnpm dev -- --list
+# 或
+pnpm dev -- -l
+```
+
+#### 恢复之前的 Session
+```bash
+pnpm dev -- --resume <session-id>
+# 或
+pnpm dev -- -r <session-id>
+```
+
+**Session 功能说明：**
+- 每次对话会自动创建并保存 Session ID
+- Session 信息保存在 `.sessions/sessions.json` 文件中
+- 可以通过 Session ID 恢复之前的对话上下文
+- Session 包含创建时间和最后访问时间信息
 
 ### 在Terminal中使用
 
