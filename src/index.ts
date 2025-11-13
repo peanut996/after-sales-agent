@@ -12,6 +12,163 @@ import { QUERY_OPTIONS, CHECK_TOOL_SECURITY_HOOKS } from "./config";
 import type { ConversationMessage, SessionInfo } from "./types";
 import { mcpServers, allowedMcpServerTools } from "./mcp-servers";
 
+// 创建支持多行输入的处理器
+function createMultilineInput(onSubmit: (message: string) => Promise<void>, promptText: string = "👤 您: ") {
+  let inputBuffer = "";
+  let cursorPosition = 0;
+  let isProcessing = false;
+
+  // 设置原始模式以捕获特殊键
+  if (process.stdin.isTTY) {
+    process.stdin.setRawMode(true);
+  }
+
+  const clearLine = () => {
+    process.stdout.write('\r\x1b[K');
+  };
+
+  const redrawPrompt = () => {
+    clearLine();
+    process.stdout.write(`${promptText}${inputBuffer}`);
+    // 移动光标到正确位置
+    const offset = inputBuffer.length - cursorPosition;
+    if (offset > 0) {
+      process.stdout.write(`\x1b[${offset}D`);
+    }
+  };
+
+  const handleInput = async () => {
+    const message = inputBuffer.trim();
+    inputBuffer = "";
+    cursorPosition = 0;
+    
+    console.log(""); // 换行
+
+    if (!message) {
+      redrawPrompt();
+      return;
+    }
+
+    if (isProcessing) {
+      console.log("⚠️  正在处理中，请稍候...\n");
+      redrawPrompt();
+      return;
+    }
+
+    isProcessing = true;
+    await onSubmit(message);
+    isProcessing = false;
+    redrawPrompt();
+  };
+
+  // 监听键盘输入
+  const keyHandler = async (key: Buffer) => {
+    const byte = key[0];
+    
+    // Ctrl+C
+    if (byte === 0x03) {
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(false);
+      }
+      console.log("\n👋 感谢使用，再见！");
+      process.exit(0);
+    }
+    
+    // Ctrl+D
+    if (byte === 0x04) {
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(false);
+      }
+      console.log("\n👋 查询结束");
+      process.exit(0);
+    }
+    
+    const str = key.toString();
+    
+    // Enter - 检查是否连续两次（空行提交）
+    if (key.length === 1 && byte === 0x0D) {
+      // 如果当前行为空或只有空格，提交
+      const currentLineStart = inputBuffer.lastIndexOf('\n') + 1;
+      const currentLine = inputBuffer.slice(currentLineStart, cursorPosition);
+      
+      if (currentLine.trim() === '' && inputBuffer.trim() !== '') {
+        // 空行且有内容，提交
+        await handleInput();
+        return;
+      }
+      
+      // 否则添加换行
+      inputBuffer = inputBuffer.slice(0, cursorPosition) + '\n' + inputBuffer.slice(cursorPosition);
+      cursorPosition++;
+      console.log("");
+      process.stdout.write(promptText);
+      return;
+    }
+    
+    // Backspace
+    if (byte === 0x7F || byte === 0x08) {
+      if (cursorPosition > 0) {
+        // 检查是否删除换行符
+        if (inputBuffer[cursorPosition - 1] === '\n') {
+          // 删除换行，需要重新绘制
+          inputBuffer = inputBuffer.slice(0, cursorPosition - 1) + inputBuffer.slice(cursorPosition);
+          cursorPosition--;
+          // 上移一行
+          process.stdout.write('\x1b[A');
+          clearLine();
+          // 重新显示当前行
+          const lineStart = inputBuffer.lastIndexOf('\n', cursorPosition - 1) + 1;
+          const nextNewline = inputBuffer.indexOf('\n', cursorPosition);
+          const currentLine = nextNewline !== -1 ? inputBuffer.slice(lineStart, nextNewline) : inputBuffer.slice(lineStart);
+          process.stdout.write(promptText + currentLine);
+        } else {
+          inputBuffer = inputBuffer.slice(0, cursorPosition - 1) + inputBuffer.slice(cursorPosition);
+          cursorPosition--;
+          redrawPrompt();
+        }
+      }
+      return;
+    }
+    
+    // 左箭头
+    if (key.length === 3 && key[0] === 0x1B && key[1] === 0x5B && key[2] === 0x44) {
+      if (cursorPosition > 0) {
+        cursorPosition--;
+        process.stdout.write('\x1b[D');
+      }
+      return;
+    }
+    
+    // 右箭头
+    if (key.length === 3 && key[0] === 0x1B && key[1] === 0x5B && key[2] === 0x43) {
+      if (cursorPosition < inputBuffer.length) {
+        cursorPosition++;
+        process.stdout.write('\x1b[C');
+      }
+      return;
+    }
+    
+    // 普通字符
+    if (byte >= 0x20 || byte === 0x09) { // 可打印字符或 Tab
+      inputBuffer = inputBuffer.slice(0, cursorPosition) + str + inputBuffer.slice(cursorPosition);
+      cursorPosition += str.length;
+      redrawPrompt();
+    }
+  };
+
+  process.stdin.on('data', keyHandler);
+
+  return {
+    show: () => redrawPrompt(),
+    cleanup: () => {
+      process.stdin.removeListener('data', keyHandler);
+      if (process.stdin.isTTY) {
+        process.stdin.setRawMode(false);
+      }
+    }
+  };
+}
+
 // Session 存储路径
 const SESSION_DIR = path.join(process.cwd(), ".sessions");
 const SESSION_FILE = path.join(SESSION_DIR, "sessions.json");
@@ -64,7 +221,8 @@ async function startQueryMode(resumeSessionId?: string) {
   console.log("\n" + "=".repeat(50));
   console.log("🤖 售后订单助手 - Claude Agent + Tool 模式");
   console.log("=".repeat(50));
-  console.log("使用 Claude Agent SDK + 注册工具进行智能查询\n");
+  console.log("使用 Claude Agent SDK + 注册工具进行智能查询");
+  console.log("💡 提示：输入内容后按空行（连续两次 Enter）提交\n");
 
   if (resumeSessionId) {
     const session = getSession(resumeSessionId);
@@ -78,37 +236,15 @@ async function startQueryMode(resumeSessionId?: string) {
     }
   }
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    prompt: "👤 您: "
-  });
-
-  let isProcessing = false;
   let currentSessionId: string | undefined = resumeSessionId;
 
-  const processInput = async (input: string) => {
-    const message = input.trim();
-
-    if (!message) {
-      rl.prompt();
-      return;
-    }
-
+  const handleMessage = async (message: string) => {
     if (isExitCommand(message)) {
       console.log("\n👋 感谢使用，再见！");
-      rl.close();
-      return;
+      process.exit(0);
     }
 
-    if (isProcessing) {
-      console.log("⚠️  正在处理中，请稍候...\n");
-      rl.prompt();
-      return;
-    }
-
-    isProcessing = true;
-    console.log("\n🤖 Claude Agent 正在处理...\n");
+    console.log("🤖 Claude Agent 正在处理...\n");
 
     try {
       // 使用 SDK 的 query 功能（Claude Agent + Tool）
@@ -157,23 +293,12 @@ async function startQueryMode(resumeSessionId?: string) {
     } catch (error) {
       console.error("❌ 查询过程中发生错误:", error);
       console.log("");
-    } finally {
-      isProcessing = false;
-      console.log(""); // 添加空行
-      rl.prompt(); // 继续下一轮查询
     }
   };
 
-  rl.on("line", async (input) => {
-    await processInput(input);
-  });
-
-  rl.on("close", () => {
-    console.log("\n👋 查询结束");
-    process.exit(0);
-  });
-
-  rl.prompt();
+  // 创建多行输入处理器
+  const input = createMultilineInput(handleMessage);
+  input.show();
 }
 
 // 交互式对话模式
@@ -185,6 +310,7 @@ async function startConversationMode(resumeSessionId?: string) {
   console.log("  1. 检查 access code 退款资格");
   console.log("  2. 回答相关问题");
   console.log("\n输入 'quit' 或 'exit' 退出对话");
+  console.log("💡 提示：输入内容后按空行（连续两次 Enter）提交");
   console.log("-".repeat(50) + "\n");
 
   if (resumeSessionId) {
@@ -199,12 +325,6 @@ async function startConversationMode(resumeSessionId?: string) {
     }
   }
 
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-    prompt: "👤 您: "
-  });
-
   let currentSessionId: string | undefined = resumeSessionId;
 
   const conversationHistory: ConversationMessage[] = [
@@ -214,11 +334,14 @@ async function startConversationMode(resumeSessionId?: string) {
     }
   ];
 
-  const processMessage = async (message: string): Promise<string> => {
+  const handleMessage = async (message: string) => {
     // 检查是否是退出命令
     if (isExitCommand(message)) {
-      return "quit";
+      console.log("\n👋 感谢使用，再见！");
+      process.exit(0);
     }
+
+    console.log("🤖 助手: 正在思考中...\n");
 
     conversationHistory.push({ role: "user", content: message });
 
@@ -274,41 +397,18 @@ async function startConversationMode(resumeSessionId?: string) {
 
       assistantText = assistantText || DEFAULT_RESPONSES[Math.floor(Math.random() * DEFAULT_RESPONSES.length)];
       conversationHistory.push({ role: "assistant", content: assistantText });
-      return assistantText;
+      
+      console.log(`🤖 助手: ${assistantText}\n`);
     } catch (e) {
       const fallback = DEFAULT_RESPONSES[Math.floor(Math.random() * DEFAULT_RESPONSES.length)];
       conversationHistory.push({ role: "assistant", content: fallback });
-      return fallback;
+      console.log(`🤖 助手: ${fallback}\n`);
     }
   };
 
-  // 处理用户输入
-  rl.prompt();
-
-  rl.on("line", async (input) => {
-    const message = input.trim();
-
-    if (message) {
-      console.log("🤖 助手: 正在思考中...\n");
-
-      const response = await processMessage(message);
-
-      if (response === "quit") {
-        console.log("\n👋 感谢使用，再见！");
-        rl.close();
-      } else {
-        console.log(`🤖 助手: ${response}\n`);
-        rl.prompt(); // 继续下一轮对话
-      }
-    } else {
-      rl.prompt(); // 继续下一轮对话
-    }
-  });
-
-  rl.on("close", () => {
-    console.log("\n👋 对话结束");
-    process.exit(0);
-  });
+  // 创建多行输入处理器
+  const input = createMultilineInput(handleMessage);
+  input.show();
 }
 
 // 列出所有 sessions
