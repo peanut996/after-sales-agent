@@ -11,14 +11,10 @@ export const checkAccessCodeRefundTool = tool(
     access_code: z.string().describe("需要查询的 access code")
   },
   async ({ access_code }: { access_code: string }) => {
-    console.log(`\n🔍 正在查询使用信息: ${access_code}...`);
-
     try {
       // 模拟浏览器访问 API
       const API_BASE_URL = "https://ghibliflowstudio.com/api";
       const API_TOKEN = process.env.GHIBLI_API_TOKEN;
-
-      console.log(`📡 查询使用信息: ${API_BASE_URL}/access-codes/${access_code}`);
 
       const response = await fetch(`${API_BASE_URL}/access-codes/${access_code}`, {
         method: "GET",
@@ -34,8 +30,6 @@ export const checkAccessCodeRefundTool = tool(
         }
       });
 
-      console.log(`📥 响应状态: ${response.status} ${response.statusText}`);
-
       if (!response.ok) {
         return {
           content: [
@@ -48,7 +42,6 @@ export const checkAccessCodeRefundTool = tool(
       }
 
       const data = await response.json() as { success: boolean; data: any };
-      console.log(`📊 响应数据:`, JSON.stringify(data, null, 2));
 
       if (!data.success) {
         return {
@@ -101,9 +94,6 @@ export const checkAccessCodeRefundTool = tool(
         totalPrice,
         refundAmount
       };
-
-      console.log("✅ 查询完成！");
-      console.log("📋 使用信息:", JSON.stringify(result, null, 2));
 
       return {
         content: [
@@ -224,15 +214,11 @@ export const deactivateAccessCodeTool = tool(
     reason: z.string().optional().describe("停用原因，如 'user_refund_request'")
   },
   async ({ access_code, reason = "user_refund_request" }: { access_code: string; reason?: string }) => {
-    console.log(`\n🔒 正在停用 access code: ${access_code}`);
-
     try {
       const API_BASE_URL = "https://ghibliflowstudio.com/api";
       const API_TOKEN = process.env.GHIBLI_API_TOKEN;
 
       // 首先获取 access code 的当前状态和使用信息
-      console.log(`📡 查询当前状态: ${API_BASE_URL}/access-codes/${access_code}`);
-
       const getResponse = await fetch(`${API_BASE_URL}/access-codes/${access_code}`, {
         method: "GET",
         headers: {
@@ -281,11 +267,7 @@ export const deactivateAccessCodeTool = tool(
       const totalPrice = initialUses * pricePerUse;
       const refundAmount = remainingUses * pricePerUse;
 
-      console.log(`📊 使用情况: 总次数=${initialUses}, 剩余=${remainingUses}, 已使用=${usedTimes}`);
-
       // 然后执行停用操作
-      console.log(`📡 使用 PATCH 方法更新状态: ${API_BASE_URL}/access-codes/${access_code}`);
-
       const response = await fetch(`${API_BASE_URL}/access-codes/${access_code}`, {
         method: "PATCH",
         headers: {
@@ -319,7 +301,6 @@ export const deactivateAccessCodeTool = tool(
       }
 
       const data = await response.json() as { success: boolean; data?: any };
-      console.log(`📊 响应数据:`, JSON.stringify(data, null, 2));
 
       if (!data.success) {
         return {
@@ -331,9 +312,6 @@ export const deactivateAccessCodeTool = tool(
           ]
         };
       }
-
-      console.log("✅ 停用完成！");
-      console.log(`📋 Access code ${access_code} 已成功设置为 inactive`);
 
       return {
         content: [
