@@ -2,6 +2,10 @@ import { query } from "@anthropic-ai/claude-agent-sdk";
 import readline from "readline";
 import fs from "fs";
 import path from "path";
+import dotenv from "dotenv";
+
+// 加载环境变量
+dotenv.config();
 
 import { CONVERSATION_SYSTEM_PROMPT, createQueryPrompt, DEFAULT_RESPONSES, isExitCommand } from "./prompts";
 import { QUERY_OPTIONS, CHECK_TOOL_SECURITY_HOOKS } from "./config";
